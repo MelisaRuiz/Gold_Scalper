@@ -1,17 +1,25 @@
-```markdown
+````markdown
 # Gold Scalper – EAS Híbrido 2025
 **AI-Powered High-Frequency Trading Bot for XAUUSD**  
 *MQL5 + Python Multi-Agent Architecture | Deterministic Discipline | Risk 0.3%*
 
+[![Python](https://img.shields.io/badge/Python-3.9%2B-blue)](https://python.org)  
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)  
+[![Commercial](https://img.shields.io/badge/License-Commercial-red)](COMMERCIAL_LICENSE.md)  
 
-## Resumen Ejecutivo
-El Sistema EAS Híbrido 2025 combina arquitectura de agentes IA con disciplina rígida de trading. Especializado en scalping de alta frecuencia en XAUUSD durante la sesión de Nueva York (09:30–11:30 ET). Basado en las mejores prácticas de OpenAI para agentes y técnicas avanzadas de prompt engineering, establece un sistema determinista con capacidades de validación inteligente.
-Cumplimiento EAS consolidado – Núcleo inmutable + validación BO5_REST (ver Cumplimiento_EAS_Hibrido.pdf)
+---
 
+## 📋 Resumen Ejecutivo
+El **Sistema EAS Híbrido 2025** combina arquitectura de agentes IA con disciplina rígida de trading. Especializado en **scalping de alta frecuencia en XAUUSD** durante la sesión de Nueva York (09:30–11:30 ET). Basado en prácticas avanzadas de OpenAI para agentes y técnicas de prompt engineering, establece un sistema **determinista** con validación inteligente.
 
-## Características Principales
+> **Cumplimiento EAS consolidado** – Núcleo inmutable + validación BO5_REST  
+> [Ver documento](docs/Cumplimiento_EAS_Hibrido.pdf)
+
+---
+
+## 🎯 Características Principales
 - **Arquitectura Multi-Agente**: Orchestrator, Macro, Signal, Liquidity agents  
-- **Disciplina Rígida**: Reglas inmutables (MQL5 `SignalGeneratorCore`)  
+- **Disciplina Rígida**: Reglas inmutables en MQL5 (`SignalGeneratorCore`)  
 - **Validación IA**: LLM agents con `temperature=0.0` para determinismo  
 - **Gestión de Riesgo**: 0.3% riesgo fijo + kill switch (2 pérdidas consecutivas)  
 - **Timeframes**: M15 (40%), H1 (30%), D1 (30%)  
@@ -20,7 +28,10 @@ Cumplimiento EAS consolidado – Núcleo inmutable + validación BO5_REST (ver C
 - **Infraestructura**: Circuit breakers, exponential backoff, health monitoring  
 - **Cumplimiento EAS**: Documento consolidado con núcleo inmutable y validación BO5_REST  
 
-## Arquitectura del Sistema
+---
+
+## 🏗️ Estructura del Proyecto
+```bash
 gold_scalper/
 ├── __init__.py
 ├── main.py
@@ -31,8 +42,8 @@ gold_scalper/
 ├── config/
 │   ├── __init__.py
 │   ├── trading_config.json
-│   ├── agents_config.json
-│   ├── risk_config.json
+│   ├── agents_config.py
+│   ├── risk_config.py
 │   ├── migration_log.json
 │   └── legacy/
 │       ├── __init__.py
@@ -57,36 +68,24 @@ gold_scalper/
 │   ├── __init__.py
 │   ├── circuit_breaker.py
 │   ├── exponential_backoff.py
-│   ├── structured_logger.py
-│   ├── config_manager.py
-│   ├── health_monitor.py
-│   ├── guardrails.py
-│   └── infrastructure_manager.py
+│   └── ...
 ├── data/
-│   ├── __init__.py
-│   ├── market_data_collector.py
-│   ├── news_analyzer.py
-│   └── data_quality_validator.py
 ├── monitoring/
-│   ├── __init__.py
-│   ├── performance_tracker.py
-│   ├── alert_system.py
-│   └── metrics_dashboard.py
 ├── tests/
-│   ├── __init__.py
-│   ├── test_agents.py
-│   ├── test_core.py
-│   └── test_infrastructure.py
 ├── scripts/
-│   ├── __init__.py
-│   └── emergency_rollback.py
 └── docs/
     ├── Cumplimiento_EAS_Hibrido.pdf
     ├── Arquitectura.pdf
+    └── arqui.png
+````
 
+---
 
-## ⚙️ Ejemplo: Núcleo Inmutable (MQL5)
-// signal_generator.mq5 - Núcleo Inmutable EAS Híbrido 2025
+## ⚙️ Núcleo Inmutable (MQL5)
+
+// signal_generator.mq5
+
+```mql5
 #property copyright "© 2025 Melisa Ruiz | HECTA"
 #property link      "https://github.com/MelisaRuiz/Gold_Scalper"
 #property version   "1.0"
@@ -94,87 +93,85 @@ gold_scalper/
 
 class SignalGeneratorCore {
 private:
-    const double RISK_PERCENT = 0.3;           // Inmutable
-    const int    MAX_CONSECUTIVE_LOSSES = 2;   // Kill Switch
-    const string TRADING_SESSION = "NY_OPEN";  // 09:30-11:30 ET
-    int          consecutive_losses = 0;
+    const double RISK_PERCENT = 0.3;
+    const int    MAX_CONSECUTIVE_LOSSES = 2;
+    const string TRADING_SESSION = "NY_OPEN";
+    int consecutive_losses = 0;
 
 public:
-    // Validación BO5_REST: Break of Structure + Retest
     bool validateBOS_RETEST(double rsi, double macd, bool break_confirmed, bool retest_successful) {
-        // Lógica determinista: RSI > 30 (oversold retest), MACD crossover, estructura confirmada
-        if (rsi > 30.0 && macd > 0.0 && break_confirmed && retest_successful) {
-            return true;  // Señal válida
-        }
-        return false;     // Rechazada
+        return (rsi > 30.0 && macd > 0.0 && break_confirmed && retest_successful);
     }
 
     void recordTradeResult(bool is_win) {
-        if (is_win) {
-            consecutive_losses = 0;
-        } else {
+        if (!is_win) {
             consecutive_losses++;
-            if (consecutive_losses >= MAX_CONSECUTIVE_LOSSES) {
-                Print("KILL SWITCH ACTIVADO: 2 pérdidas consecutivas");
-                ExpertRemove();  // Detiene el EA
-            }
-        }
+            if (consecutive_losses >= MAX_CONSECUTIVE_LOSSES) ExpertRemove();
+        } else consecutive_losses = 0;
     }
 };
 
 SignalGeneratorCore core;
 
-// OnTick: Ejecución en tiempo real
 void OnTick() {
     double rsi  = iRSI(_Symbol, PERIOD_M15, 14, PRICE_CLOSE, 0);
     double macd = iMACD(_Symbol, PERIOD_M15, 12, 26, 9, PRICE_CLOSE, MODE_MAIN, 0);
-    
-    // Simulación de confirmación BO5 (en producción: análisis de estructura)
     bool break_confirmed = true;
     bool retest_successful = true;
 
     if (core.validateBOS_RETEST(rsi, macd, break_confirmed, retest_successful)) {
         Print("SEÑAL VÁLIDA: Abrir operación XAUUSD");
-        // OrderSend(...)
     }
 }
+```
 
+---
 
 ## 📄 Documentación
-- [Cumplimiento EAS Híbrido 2025](docs/Cumplimiento_EAS.pdf)
-- [Arquitectura Sistema](docs/Aquitectura.pdf)
-- [Instalación y Configuración](Instalacion_y_Configuracion.txt)
-- [Requirements](requirements.txt)
 
-## Instalación y Configuración
-Prerrequisitos
-Python 3.9+
-8GB RAM mínimo (16GB recomendado)
-Conexión a internet estable
-Acceso a datos de mercado (MT5/IBKR/Polygon)
+* [Cumplimiento EAS Híbrido 2025](docs/Cumplimiento_EAS_Hibrido.pdf)
+* [Arquitectura del Sistema](docs/Arquitectura.pdf)
+* [Instalación y Configuración](Instalacion_y_Configuracion.txt)
+* [Requirements](requirements.txt)
 
-## Instalación
+---
+
+## ⚙️ Instalación
+
+```bash
 git clone https://github.com/MelisaRuiz/Gold_Scalper.git
 cd Gold_Scalper
 python -m venv venv
 source venv/bin/activate  # Linux/Mac
-# venv\Scripts\activate   # Windows
+# venv\Scripts\activate    # Windows
 pip install -r requirements.txt
 cp .env.example .env
+```
 
-## Seguridad y Configuración
-- Usa .env.example → copia a .env (nunca subas .env)
-- .gitignore protege: venv/, __pycache__/, .env, PDFs, logs
-- Credenciales: MT5, IBKR, Anthropic, AWS, etc.
+---
 
+## 🔐 Seguridad y Configuración
 
-## 📄 Licensing
-This project is **dual-licensed**:
-- **Open Source**: [GPL v3](LICENSE) – Free for non-commercial use; derivatives must be open-source.
-- **Commercial**: [Commercial License](COMMERCIAL_LICENSE.md) – For proprietary/premium use (contact dianaruizn10@gmail.com).
+* `.env.example` → copia a `.env` (nunca subir `.env`)
+* `.gitignore` protege: venv/, **pycache**/, .env, PDFs, logs
+* Credenciales locales: MT5, IBKR, Anthropic, AWS, Polygon
+
+---
+
+## 📄 Licencias
+
+Este proyecto tiene **dual-license**:
+
+| Tipo        | Uso                                 | Archivo                                        |
+| ----------- | ----------------------------------- | ---------------------------------------------- |
+| Open Source | No comercial, derivados open        | [GPL v3](LICENSE)                              |
+| Comercial   | Propietario, MT5, fondos, dashboard | [COMMERCIAL_LICENSE.md](COMMERCIAL_LICENSE.md) |
 
 > Premium features: MT5 integration, proprietary ML models, enterprise dashboard.
 
 ---
+
 *Developed by Melisa Ruiz | Self-Directed | 2025*
+
 ```
+
