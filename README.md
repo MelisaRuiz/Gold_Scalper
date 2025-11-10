@@ -3,7 +3,6 @@
 **AI-Powered High-Frequency Trading Bot for XAUUSD**  
 *MQL5 + Python Multi-Agent Architecture | Deterministic Discipline | Risk 0.3%*
 
-![Architecture](docs/arqui.png)
 
 ## 📋 Resumen Ejecutivo
 El **Sistema EAS Híbrido 2025** combina arquitectura de agentes IA con disciplina rígida de trading. Especializado en **scalping de alta frecuencia en XAUUSD** durante la sesión de Nueva York (09:30–11:30 ET). Basado en las mejores prácticas de OpenAI para agentes y técnicas avanzadas de prompt engineering, establece un sistema determinista con capacidades de validación inteligente.
@@ -18,60 +17,6 @@ El **Sistema EAS Híbrido 2025** combina arquitectura de agentes IA con discipli
 - **Monitoreo**: Dashboard en tiempo real (planned)  
 - **Infraestructura**: Circuit breakers, exponential backoff, health monitoring  
 - **Cumplimiento EAS**: Documento consolidado con núcleo inmutable y validación BO5_REST  
-
-## 🏗️ Arquitectura del Sistema
-```
-hecta_gold_scalper/
-├── agents/
-│   ├── __init__.py
-│   ├── agent_orchestrator.py     # Coordina flujo de agentes
-│   ├── macro_analysis_agent.py   # Análisis macro D1/H1
-│   ├── signal_validation_agent.py # Validación LLM de señales
-│   └── liquidity_analysis_agent.py # Análisis de liquidez
-├── core/                             
-│   ├── __init__.py
-│   ├── risk_manager.py
-│   ├── signal_generator.mq5      # MQL5 núcleo inmutable para validación
-│   ├── signal_generator.py       # Generador Python con integración MQL5
-│   ├── execution_engine.py
-│   ├── session_manager.py
-│   ├── immutable_core.py         # Reglas inmutables EAS
-│   └── immutable_config.py       # Gestor de configuración inmutable
-├── infrastructure/                       
-│   ├── __init__.py
-│   ├── circuit_breaker.py               
-│   ├── exponential_backoff.py           
-│   ├── structured_logger.py             
-│   ├── config_manager.py                
-│   ├── health_monitor.py                
-│   ├── guardrails.py                    
-│   └── infrastructure_manager.py       
-├── data/
-│   ├── __init__.py
-│   ├── market_data_collector.py
-│   ├── news_analyzer.py
-│   └── data_quality_validator.py
-├── monitoring/
-│   ├── __init__.py
-│   ├── performance_tracker.py
-│   ├── alert_system.py
-│   └── metrics_dashboard.py
-├── tests/
-│   ├── __init__.py
-│   ├── test_agents.py
-│   ├── test_core.py
-│   └── test_infrastructure.py
-├── scripts/
-│   ├── __init__.py
-│   └── emergency_rollback.py
-├── __init__.py
-├── main.py                       # Entry point principal
-├── requirements.txt              # Dependencias Python
-├── README.md                     # Documentación
-└── docs/
-    ├── Aquitectura.pdf           # Estructura sistema
-    ├── Cumplimiento_EAS_Hibrido.pdf # Cumplimiento y núcleo
-```
 
 ## ⚙️ Ejemplo: Núcleo Inmutable (MQL5)
 ```mql5
