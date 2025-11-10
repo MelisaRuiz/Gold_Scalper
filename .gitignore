@@ -1,0 +1,133 @@
+# === Python ===
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+ENV/
+env.bak/
+venv.bak/
+
+# === Virtual Environment ===
+pip-log.txt
+pip-delete-this-directory.txt
+.pip-cache/
+
+# === IDE / Editors ===
+.idea/
+.vscode/
+*.sublime-workspace
+*.sublime-project
+*.code-workspace
+
+# === OS Generated ===
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# === Python Build / Packaging ===
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# === PyInstaller ===
+*.manifest
+*.spec
+
+# === Logs y Datos Temporales ===
+*.log
+logs/
+*.csv
+*.db
+*.sqlite3
+*.bak
+*.tmp
+*.temp
+
+# === Entorno y Configuración Sensible ===
+.env
+.env.local
+.env.*.local
+config/*.json
+!config/trading_config.json  # ← Si quieres versionar uno base (sin secrets)
+!config/legacy/*.json       # ← Versionar plantillas, pero no con datos reales
+*.secrets.json
+*.credentials.json
+*.key
+*.pem
+*.pfx
+
+# === Documentos de Trabajo / PDFs / Imágenes Temporales ===
+*.pdf
+*.docx
+*.xlsx
+*.png
+*.jpg
+*.jpeg
+*.gif
+docs/*.pdf
+docs/*.docx
+
+# === Datos de Mercado / Caché Local ===
+data/raw/
+data/cache/
+data/*.csv
+data/*.json
+data/*.parquet
+
+# === Testing / Coverage ===
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.pytest_cache/
+.coverage
+
+# === Jupyter / Notebooks (si usas) ===
+.ipynb_checkpoints
+
+# === MetaTrader5 (si se integra localmente) ===
+*.ex5
+*.mq5.bak
+MT5/
+
+# === Archivos de Migración / Rollback Local ===
+scripts/*.bak
+*.backup
+
+# === Ignorar todo en legacy excepto plantillas públicas ===
+config/legacy/*
+!config/legacy/ea_settings.json
+!config/legacy/hecta_gold_config.json
+
+# === Exclusiones específicas del proyecto ===
+migration_log.json
+risk_config.json
+agents_config.json
+trading_config.json
+
+# === Ignorar venv si se crea en raíz ===
+venv/ 
