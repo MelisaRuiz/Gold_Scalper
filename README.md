@@ -122,10 +122,10 @@ void OnTick() {
 ```
 
 ## 📄 Documentación
-- [Cumplimiento EAS Híbrido 2025](docs/Cumplimiento_EAS_Hibrido.pdf)
+- [Cumplimiento EAS Híbrido 2025](docs/Cumplimiento_EAS.pdf)
 - [Arquitectura Sistema](docs/Aquitectura.pdf)
-- [Instalación y Configuración](docs/Instalacion_y_Configuracion.txt)
-- [arqui.png](docs/arqui.png) – Diagrama arquitectura
+- [Instalación y Configuración](Instalacion_y_Configuracion.txt)
+- [Requirements](requirements.txt)
 
 ## ⚙️ Instalación y Configuración
 ### Prerrequisitos
