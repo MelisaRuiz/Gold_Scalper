@@ -1,0 +1,103 @@
+{
+  "//": "LEGACY - HECTA GOLD EA SETTINGS v8.5 - MIGRATED TO EAS HYBRID 2025",
+  "metadata": {
+    "status": "MIGRATED",
+    "migration_date": "2025-01-18T10:00:00Z",
+    "current_version": "EAS_Hybrid_2025_v1.0",
+    "backup_purpose": "EMERGENCY_ROLLBACK_ONLY"
+  },
+  
+  "instrument": "XAUUSD",
+  "version": "8.5_GOLD_HYBRID",
+  "magic_number": 20251014,
+  
+  "sync_parameters": {
+    "freshness_threshold_seconds": 300,
+    "max_retry_attempts": 3,
+    "retry_delay_ms": 1000,
+    "critical_data_timeout": 10,
+    "enable_persistent_state": true
+  },
+  
+  "gold_specific_parameters": {
+    "MaxSpreadPips": 3.0,
+    "ATRMultiplier": 1.8,
+    "VolatilityThreshold": 300,
+    "OvernightRiskReduction": 0.6,
+    "LondonNYBoost": 1.3,
+    "AsianSessionReduce": 0.7,
+    "EnhancedSyncEnabled": true,
+    "LiquidityAnalysisEnabled": true,
+    "FVGDetectionEnabled": true,
+    "OrderBlockDetectionEnabled": true
+  },
+  
+  "core_rules": {
+    "RiskPerTrade": 0.3,
+    "MaxDailyRisk": 1.0,
+    "RiskReward": 2.0,
+    "MaxTradesPerDay": 3,
+    "ConsecutiveLossLimit": 2,
+    "NYOpenHour": 9,
+    "NYOpenMinute": 30,
+    "PremarketMinutes": 60,
+    "TradingHours": 2,
+    "UseMacroBias": true,
+    "FailSecureEnabled": true,
+    "BreakevenRatio": 1.5,
+    "EnablePartialClose": false,
+    "EnableTrailingStop": false
+  },
+  
+  "execution_parameters": {
+    "ExecutionMode": "MARKET",
+    "EnableExactPriceMode": true,
+    "SlippageTolerance": 10,
+    "MaxRetries": 3,
+    "RetryDelayMs": 1000,
+    "EnableBackoffExponential": true
+  },
+  
+  "security_parameters": {
+    "min_data_freshness_score": 0.7,
+    "max_sync_issues": 3,
+    "emergency_shutdown_threshold": 5,
+    "enable_circuit_breaker": true,
+    "circuit_breaker_failures": 5,
+    "circuit_breaker_cooldown": 1800
+  },
+  
+  "monitoring": {
+    "enable_structured_logging": true,
+    "log_level": "INFO",
+    "enable_performance_metrics": true,
+    "enable_alert_system": true,
+    "dashboard_update_interval": 1000
+  },
+  
+  "advanced_settings": {
+    "EnableMultiTimeframeAnalysis": true,
+    "Timeframes": ["M1", "M5", "M15", "H1"],
+    "EnableLiquiditySweepDetection": true,
+    "EnablePullbackAnalysis": true,
+    "EnableBOSRetestStrategy": true,
+    "MacroBiasScoring": true,
+    "RiskOnThreshold": 7,
+    "RiskOffThreshold": 4
+  },
+
+  "migration_notes": {
+    "replacement_config": "../trading_config.json",
+    "critical_parameters_preserved": [
+      "RiskPerTrade: 0.3%",
+      "MaxDailyRisk: 1.0%", 
+      "ConsecutiveLossLimit: 2",
+      "MaxSpreadPips: 3.0"
+    ],
+    "deprecated_features": [
+      "EnablePartialClose",
+      "EnableTrailingStop",
+      "AsianSessionReduce"
+    ]
+  }
+}

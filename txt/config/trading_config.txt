@@ -1,0 +1,159 @@
+{
+  "version": "EAS_Hybrid_2025_v1.0",
+  "last_updated": "2025-01-18T10:00:00Z",
+  "description": "Configuración de Trading - Sistema EAS Híbrido 2025 para XAUUSD",
+  
+  "instrument_specs": {
+    "primary_symbol": "XAUUSD",
+    "secondary_symbols": [],
+    "trading_session": "NY_OPEN",
+    "session_hours": {
+      "london_ny_overlap": "13:00-17:00 GMT",
+      "ny_open_optimal": "09:30-11:30 ET",
+      "active_session": "09:30-11:30 ET"
+    }
+  },
+  
+  "core_rules": {
+    "risk_per_trade": 0.3,
+    "max_daily_risk": 1.0,
+    "consecutive_loss_limit": 2,
+    "risk_reward_ratio": 2.0,
+    "max_trades_per_day": 20,
+    "trading_hours": 2,
+    "premarket_duration_hours": 1,
+    "breakeven_ratio": 1.5,
+    "vix_spike_threshold": 25.0,
+    "dxy_spike_threshold": 105.0,
+    "real_yields_threshold": 2.0
+  },
+  
+  "timeframe_config": {
+    "primary_timeframe": "M15",
+    "secondary_timeframes": ["H1", "D1"],
+    "weight_distribution": {
+      "M15": 0.4,
+      "H1": 0.3,
+      "D1": 0.3
+    },
+    "data_refresh_rate_ms": 1000
+  },
+  
+  "trading_style": {
+    "style": "HIGH_FREQUENCY_SCALPING",
+    "avg_trade_duration_min": 2,
+    "max_trade_duration_min": 15,
+    "max_daily_trades": 20,
+    "cooldown_between_trades_sec": 30
+  },
+  
+  "signal_generation": {
+    "primary_pattern": "BOS_RETEST",
+    "secondary_patterns": ["LIQUIDITY_SWEEP", "ORDERBLOCK"],
+    "pattern_confidence_threshold": 0.75,
+    "volume_confirmation_required": true,
+    "multi_timeframe_confirmation": true,
+    
+    "bos_retest_params": {
+      "liquidity_sweep_required": true,
+      "orderblock_retest_required": true,
+      "retest_confidence_threshold": 0.8,
+      "max_retest_distance_pips": 2.5
+    },
+    
+    "liquidity_sweep_params": {
+      "sweep_depth_pips": 3.0,
+      "sweep_volume_multiplier": 1.5,
+      "rejection_required": true
+    }
+  },
+  
+  "entry_execution": {
+    "entry_type": "LIMIT_ORDER",
+    "max_slippage_pips": 0.5,
+    "max_requotes": 2,
+    "execution_timeout_ms": 5000,
+    "partial_fills_allowed": false,
+    
+    "limit_order_params": {
+      "offset_from_signal_pips": 0.2,
+      "expiration_minutes": 5,
+      "fill_or_kill": true
+    }
+  },
+  
+  "exit_management": {
+    "take_profit_type": "FIXED_RR",
+    "stop_loss_type": "STRUCTURE_BASED",
+    
+    "fixed_rr_params": {
+      "risk_reward_ratio": 2.0,
+      "min_acceptable_rr": 1.5
+    },
+    
+    "structure_based_sl": {
+      "beyond_liquidity_sweep": true,
+      "beyond_orderblock": true,
+      "additional_buffer_pips": 0.5
+    },
+    
+    "trailing_stop": {
+      "enabled": false,
+      "activation_pips": 5.0,
+      "trailing_step_pips": 1.0
+    },
+    
+    "break_even": {
+      "enabled": true,
+      "activation_pips": 5.0,
+      "move_to_break_even": true
+    }
+  },
+  
+  "session_filters": {
+    "news_filter": {
+      "enabled": true,
+      "pre_news_buffer_min": 15,
+      "post_news_buffer_min": 15,
+      "critical_events": ["FED_RATE_DECISION", "NFP_REPORT", "CPI_DATA"]
+    },
+    
+    "volatility_filter": {
+      "enabled": true,
+      "max_atr_multiplier": 3.0,
+      "min_atr_multiplier": 0.5,
+      "volatility_timeframe": "H1"
+    },
+    
+    "spread_filter": {
+      "enabled": true,
+      "max_allowed_spread_pips": 3.0,
+      "typical_spread_pips": 0.15
+    },
+    
+    "time_filter": {
+      "enabled": true,
+      "trading_days": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+      "session_start": "09:30",
+      "session_end": "11:30",
+      "timezone": "America/New_York"
+    }
+  },
+  
+  "performance_limits": {
+    "daily_loss_limit_percent": 1.0,
+    "weekly_loss_limit_percent": 3.0,
+    "monthly_loss_limit_percent": 6.0,
+    "max_consecutive_losses": 2,
+    "daily_trade_limit": 25,
+    "hourly_trade_limit": 8
+  },
+  
+  "system_behavior": {
+    "auto_restart_on_crash": true,
+    "health_check_interval_sec": 30,
+    "log_level": "INFO",
+    "debug_mode": false,
+    "paper_trading": false
+  }
+}

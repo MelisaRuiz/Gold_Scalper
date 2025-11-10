@@ -1,0 +1,562 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Circuit Breaker - MT5 Scalping Optimized
+Ultra-fast recovery and low thresholds for high-frequency trading.
+CORREGIDO Y FUNCIONAL para EAS Híbrido 2025
+"""
+
+import time
+import threading
+import logging
+import random
+from datetime import datetime, timedelta
+from typing import Dict, Any, Optional, Callable
+from enum import Enum
+from functools import wraps
+
+# ===== IMPLEMENTACIÓN MÍNIMA DE LOGGER ESTRUCTURADO =====
+try:
+    from infrastructure.structured_logger import StructuredLogger
+    logger = StructuredLogger("HECTAGold.CircuitBreaker")
+except ImportError:
+    # Fallback a logger estándar
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger("HECTAGold.CircuitBreaker")
+
+# ===== IMPLEMENTACIÓN OPCIONAL DE PROMETHEUS =====
+try:
+    from prometheus_client import Counter, Gauge, Histogram
+    PROMETHEUS_AVAILABLE = True
+    
+    # Métricas optimizadas para scalping
+    FAILURES = Counter('circuit_failures_total', 'Total failures', ['circuit', 'error_type'])
+    SUCCESS = Counter('circuit_successes_total', 'Total successes', ['circuit'])
+    TRIPS = Counter('circuit_trips_total', 'Circuit trips', ['circuit'])
+    RECOVERIES = Counter('circuit_recoveries_total', 'Circuit recoveries', ['circuit'])
+    STATE_GAUGE = Gauge('circuit_state', 'Circuit state (0=closed,1=open,2=half)', ['circuit'])
+    LATENCY_HISTOGRAM = Histogram('circuit_latency_seconds', 'Circuit operation latency', ['circuit'])
+    
+except ImportError:
+    PROMETHEUS_AVAILABLE = False
+    logger.warning("⚠️ Prometheus client no disponible - métricas desactivadas")
+
+class CircuitState(Enum):
+    CLOSED = "CLOSED"
+    OPEN = "OPEN"
+    HALF_OPEN = "HALF_OPEN"
+
+class CircuitBreakerOpenException(Exception):
+    """Excepción específica para circuit breaker abierto"""
+    pass
+
+class MT5ConnectionError(Exception):
+    """Excepción específica para errores de conexión MT5"""
+    pass
+
+class CircuitBreaker:
+    def __init__(self, 
+                 failure_threshold: int = 2,  # REDUCIDO de 5 a 2 para MT5
+                 recovery_timeout: int = 300,  # REDUCIDO de 1800 a 300s (5min)
+                 name: str = "Unnamed",
+                 half_open_max_calls: int = 2,  # Reducido para recuperación más rápida
+                 success_threshold: float = 0.8,  # Más estricto para half-open
+                 base_delay: float = 0.1,  # REDUCIDO de 1.0s a 0.1s para scalping
+                 max_delay: float = 5.0,  # REDUCIDO de 60s a 5s
+                 circuit_type: str = "general"):  # Nuevo: tipo específico
+                 
+        # PARÁMETROS OPTIMIZADOS PARA SCALPING MT5
+        self.failure_threshold = failure_threshold
+        self.recovery_timeout = recovery_timeout
+        self.name = name
+        self.circuit_type = circuit_type
+        self.half_open_max_calls = half_open_max_calls
+        self.success_threshold = success_threshold
+        self.base_delay = base_delay
+        self.max_delay = max_delay
+        
+        # Estado interno
+        self.failure_count = 0
+        self.last_failure_time: Optional[datetime] = None
+        self.state = CircuitState.CLOSED
+        self.lock = threading.RLock()  # Changed to RLock for better performance
+        self.half_open_calls = 0
+        self.half_open_successes = 0
+        
+        # Métricas optimizadas para scalping
+        self.metrics = {
+            "total_failures": 0, 
+            "total_successes": 0, 
+            "total_trips": 0, 
+            "total_recoveries": 0,
+            "last_trip_time": None, 
+            "last_recovery_time": None, 
+            "average_failure_rate": 0.0, 
+            "uptime_percentage": 100.0,
+            "state_changes": [],
+            "consecutive_successes": 0,
+            "consecutive_failures": 0,
+            "avg_recovery_time_seconds": 0.0
+        }
+        
+        if PROMETHEUS_AVAILABLE:
+            STATE_GAUGE.labels(circuit=name).set(0)
+        
+        # Configuración específica por tipo de circuito
+        self._apply_circuit_type_settings()
+        
+        logger.info(f"🔌 Breaker '{name}' ({circuit_type}): threshold={failure_threshold}, "
+                   f"timeout={recovery_timeout}s, delay={base_delay}-{max_delay}s")
+
+    def _apply_circuit_type_settings(self):
+        """Aplica configuraciones específicas por tipo de circuito"""
+        type_settings = {
+            "mt5_connection": {
+                "failure_threshold": 2,      # Muy sensible para conexión
+                "recovery_timeout": 120,     # 2 minutos para reconexión
+                "base_delay": 0.1,
+                "max_delay": 2.0
+            },
+            "order_execution": {
+                "failure_threshold": 3,      # Un poco más tolerante para ejecución
+                "recovery_timeout": 180,     # 3 minutos
+                "base_delay": 0.05,          # Muy rápido para ejecución
+                "max_delay": 1.0
+            },
+            "data_feed": {
+                "failure_threshold": 4,      # Más tolerante para datos
+                "recovery_timeout": 300,     # 5 minutos
+                "base_delay": 0.2,
+                "max_delay": 3.0
+            },
+            "ia_validation": {
+                "failure_threshold": 2,      # Sensible para IA
+                "recovery_timeout": 60,      # 1 minuto para IA
+                "base_delay": 0.1,
+                "max_delay": 2.0
+            }
+        }
+        
+        if self.circuit_type in type_settings:
+            settings = type_settings[self.circuit_type]
+            for key, value in settings.items():
+                if hasattr(self, key):
+                    setattr(self, key, value)
+
+    def call(self, func: Callable, *args, **kwargs):
+        """
+        Ejecuta función protegida con circuit breaker optimizado para scalping.
+        Target latency: < 10ms en camino feliz (closed state)
+        """
+        start_time = time.time()
+        
+        with self.lock:
+            # Manejar estado OPEN con timeout de recuperación más rápido
+            if self.state == CircuitState.OPEN:
+                elapsed = (datetime.now() - self.last_failure_time).total_seconds() if self.last_failure_time else 0
+                if elapsed > self.recovery_timeout:
+                    self._transition_to_half_open()
+                else:
+                    remaining = self.recovery_timeout - elapsed
+                    if PROMETHEUS_AVAILABLE:
+                        FAILURES.labels(circuit=self.name, error_type="circuit_open").inc()
+                    latency = (time.time() - start_time) * 1000
+                    if PROMETHEUS_AVAILABLE:
+                        LATENCY_HISTOGRAM.labels(circuit=self.name).observe(latency / 1000)
+                    raise CircuitBreakerOpenException(
+                        f"Breaker {self.name} OPEN ({remaining:.1f}s remaining)"
+                    )
+
+            # Manejar límite de llamadas HALF_OPEN
+            if self.state == CircuitState.HALF_OPEN and self.half_open_calls >= self.half_open_max_calls:
+                self._transition_to_open("Max half-open calls reached")
+                if PROMETHEUS_AVAILABLE:
+                    FAILURES.labels(circuit=self.name, error_type="half_open_limit").inc()
+                latency = (time.time() - start_time) * 1000
+                if PROMETHEUS_AVAILABLE:
+                    LATENCY_HISTOGRAM.labels(circuit=self.name).observe(latency / 1000)
+                raise CircuitBreakerOpenException(f"Breaker {self.name} reverted to OPEN")
+
+            # Calcular backoff optimizado para scalping (solo en half-open)
+            delay = 0.0
+            if self.state == CircuitState.HALF_OPEN:
+                attempt = self.half_open_calls + 1
+                delay = min(self.base_delay * (2 ** (attempt - 1)), self.max_delay)
+                # Jitter reducido para scalping
+                delay += random.uniform(0, 0.05 * delay)  # 5% jitter vs 10% original
+                
+                if delay > 0:
+                    time.sleep(delay)
+
+        # Ejecutar función protegida (fuera del lock para mejor performance)
+        try:
+            result = func(*args, **kwargs)
+            with self.lock:
+                self._on_success()
+            latency = (time.time() - start_time) * 1000
+            if PROMETHEUS_AVAILABLE:
+                LATENCY_HISTOGRAM.labels(circuit=self.name).observe(latency / 1000)
+            
+            if latency > 50:  # Alertar sobre latencia alta
+                logger.warning(f"⚠️ Circuit {self.name} latency high: {latency:.1f}ms")
+                
+            return result
+            
+        except Exception as e:
+            with self.lock:
+                self._on_failure(e)
+            latency = (time.time() - start_time) * 1000
+            if PROMETHEUS_AVAILABLE:
+                LATENCY_HISTOGRAM.labels(circuit=self.name).observe(latency / 1000)
+            raise
+
+    def _on_success(self):
+        """Maneja éxito con métricas optimizadas"""
+        self.metrics['total_successes'] += 1
+        self.metrics['consecutive_successes'] += 1
+        self.metrics['consecutive_failures'] = 0
+        if PROMETHEUS_AVAILABLE:
+            SUCCESS.labels(circuit=self.name).inc()
+        
+        if self.state == CircuitState.HALF_OPEN:
+            self.half_open_successes += 1
+            success_ratio = self.half_open_successes / max(self.half_open_calls, 1)
+            
+            # Transición más rápida a CLOSED si tenemos éxito suficiente
+            if success_ratio >= self.success_threshold:
+                self._transition_to_closed()
+                
+        self._log_event("success", {})
+
+    def _on_failure(self, exception: Exception):
+        """Maneja fallo con clasificación de errores"""
+        self.failure_count += 1
+        self.metrics['total_failures'] += 1
+        self.metrics['consecutive_failures'] += 1
+        self.metrics['consecutive_successes'] = 0
+        
+        # Clasificar tipo de error para métricas
+        error_type = self._classify_error(exception)
+        if PROMETHEUS_AVAILABLE:
+            FAILURES.labels(circuit=self.name, error_type=error_type).inc()
+        
+        self.last_failure_time = datetime.now()
+        
+        # Transición más sensible a OPEN (umbral más bajo)
+        if self.failure_count >= self.failure_threshold:
+            self._transition_to_open(f"{error_type}: {str(exception)}")
+            
+        self._log_event("failure", {"error": str(exception), "error_type": error_type})
+
+    def _classify_error(self, exception: Exception) -> str:
+        """Clasifica errores para mejores métricas y recovery"""
+        error_str = str(exception).lower()
+        
+        if "trade context busy" in error_str or "147" in error_str:
+            return "trade_context_busy"
+        elif "invalid stops" in error_str or "130" in error_str:
+            return "invalid_stops"
+        elif "requote" in error_str or "138" in error_str:
+            return "requote"
+        elif "timeout" in error_str:
+            return "timeout"
+        elif "connection" in error_str or "network" in error_str:
+            return "connection"
+        elif "not enough money" in error_str:
+            return "insufficient_funds"
+        else:
+            return "other"
+
+    def _transition_to_open(self, reason: str):
+        """Transición a OPEN state con recovery timeout optimizado"""
+        if self.state != CircuitState.OPEN:
+            self.state = CircuitState.OPEN
+            self.metrics['total_trips'] += 1
+            if PROMETHEUS_AVAILABLE:
+                TRIPS.labels(circuit=self.name).inc()
+            self.metrics['last_trip_time'] = datetime.now()
+            if PROMETHEUS_AVAILABLE:
+                STATE_GAUGE.labels(circuit=self.name).set(1)
+            
+            # Log específico por tipo de circuito
+            if self.circuit_type == "mt5_connection":
+                logger.critical(f"🔴 MT5 Connection Breaker OPEN: {reason}")
+            else:
+                logger.warning(f"🔴 Circuit {self.name} OPEN: {reason}")
+                
+            self._log_event("trip_to_open", {"reason": reason})
+
+    def _transition_to_half_open(self):
+        """Transición a HALF_OPEN con reset de contadores"""
+        self.state = CircuitState.HALF_OPEN
+        self.half_open_calls = 0
+        self.half_open_successes = 0
+        if PROMETHEUS_AVAILABLE:
+            STATE_GAUGE.labels(circuit=self.name).set(2)
+        
+        logger.info(f"🟡 Circuit {self.name} transitioning to HALF_OPEN")
+        self._log_event("trip_to_half_open", {})
+
+    def _transition_to_closed(self):
+        """Transición a CLOSED state con métricas de recovery"""
+        self.state = CircuitState.CLOSED
+        self.failure_count = 0
+        self.metrics['total_recoveries'] += 1
+        if PROMETHEUS_AVAILABLE:
+            RECOVERIES.labels(circuit=self.name).inc()
+        self.metrics['last_recovery_time'] = datetime.now()
+        if PROMETHEUS_AVAILABLE:
+            STATE_GAUGE.labels(circuit=self.name).set(0)
+        
+        # Calcular tiempo de recovery
+        if self.metrics['last_trip_time']:
+            recovery_time = (datetime.now() - self.metrics['last_trip_time']).total_seconds()
+            self.metrics['avg_recovery_time_seconds'] = (
+                self.metrics['avg_recovery_time_seconds'] + recovery_time
+            ) / 2
+        
+        logger.info(f"🟢 Circuit {self.name} recovered to CLOSED state")
+        self._log_event("recovery_to_closed", {})
+
+    def _log_event(self, event_type: str, details: Dict[str, Any]):
+        """Logging optimizado para scalping"""
+        entry = {
+            "timestamp": datetime.now().isoformat(),
+            "event_type": f"circuit_{event_type}",
+            "circuit_name": self.name,
+            "circuit_type": self.circuit_type,
+            "state": self.state.value,
+            "failure_count": self.failure_count,
+            "details": details
+        }
+        
+        # Nivel de log según severidad
+        if event_type in ["failure", "trip_to_open"]:
+            if self.circuit_type == "mt5_connection":
+                logger.critical(f"CRITICAL_{event_type.upper()}: {entry}")
+            else:
+                logger.warning(f"WARNING_{event_type.upper()}: {entry}")
+        else:
+            logger.info(f"INFO_{event_type.upper()}: {entry}")
+
+    def get_metrics(self) -> Dict[str, Any]:
+        """Métricas optimizadas para monitoring de scalping"""
+        metrics = self.metrics.copy()
+        total_operations = metrics['total_failures'] + metrics['total_successes']
+        
+        metrics.update({
+            'failure_rate': (metrics['total_failures'] / max(total_operations, 1)) * 100,
+            'success_rate': (metrics['total_successes'] / max(total_operations, 1)) * 100,
+            'current_state': self.state.value,
+            'failure_threshold': self.failure_threshold,
+            'recovery_timeout': self.recovery_timeout,
+            'time_since_last_trip': (
+                (datetime.now() - self.metrics['last_trip_time']).total_seconds() 
+                if self.metrics['last_trip_time'] else None
+            ),
+            'half_open_progress': f"{self.half_open_successes}/{self.half_open_max_calls}" 
+                                if self.state == CircuitState.HALF_OPEN else "N/A"
+        })
+        
+        return metrics
+
+    def reset(self):
+        """Reset completo del circuit breaker"""
+        with self.lock:
+            self.state = CircuitState.CLOSED
+            self.failure_count = 0
+            self.half_open_calls = 0
+            self.half_open_successes = 0
+            self.metrics = {k: 0 if isinstance(v, (int, float)) else v for k, v in self.metrics.items()}
+            self.metrics['uptime_percentage'] = 100.0
+            if PROMETHEUS_AVAILABLE:
+                STATE_GAUGE.labels(circuit=self.name).set(0)
+            logger.info(f"🔄 Breaker '{self.name}' completely reset")
+
+    def force_open(self, reason: str):
+        """Forzar apertura del circuito (para emergencias)"""
+        with self.lock:
+            self._transition_to_open(f"FORCED: {reason}")
+
+    def get_state(self) -> CircuitState:
+        """Obtener estado actual (thread-safe)"""
+        with self.lock:
+            return self.state
+
+    def can_attempt(self) -> bool:
+        """Verificación rápida si se puede intentar operación"""
+        with self.lock:
+            if self.state == CircuitState.OPEN:
+                elapsed = (datetime.now() - self.last_failure_time).total_seconds() if self.last_failure_time else 0
+                return elapsed > self.recovery_timeout
+            return True
+
+    def get_error_rate(self) -> float:
+        """Obtiene tasa de errores para HealthMonitor"""
+        total = self.metrics['total_failures'] + self.metrics['total_successes']
+        return self.metrics['total_failures'] / max(total, 1) if total > 0 else 0.0
+
+    def get_status(self) -> str:
+        """Obtiene estado para HealthMonitor"""
+        return self.state.value
+
+
+def circuit_breaker_protected(circuit_breaker: CircuitBreaker):
+    """Decorator optimizado para scalping"""
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            return circuit_breaker.call(func, *args, **kwargs)
+        return wrapper
+    return decorator
+
+
+class CircuitBreakerManager:
+    """Manager optimizado para MT5 scalping con circuit breakers específicos"""
+    
+    def __init__(self):
+        self.circuits: Dict[str, CircuitBreaker] = {}
+        self.lock = threading.RLock()
+        
+        # Crear circuit breakers críticos por defecto
+        self._create_default_circuits()
+
+    def _create_default_circuits(self):
+        """Crea circuit breakers críticos para MT5 scalping"""
+        default_circuits = {
+            "mt5_connection": {
+                "circuit_type": "mt5_connection",
+                "failure_threshold": 2,
+                "recovery_timeout": 120,
+                "base_delay": 0.1,
+                "max_delay": 2.0
+            },
+            "order_execution": {
+                "circuit_type": "order_execution", 
+                "failure_threshold": 3,
+                "recovery_timeout": 180,
+                "base_delay": 0.05,
+                "max_delay": 1.0
+            },
+            "market_data": {
+                "circuit_type": "data_feed",
+                "failure_threshold": 4,
+                "recovery_timeout": 300,
+                "base_delay": 0.2,
+                "max_delay": 3.0
+            },
+            "ia_validation": {
+                "circuit_type": "ia_validation",
+                "failure_threshold": 2,
+                "recovery_timeout": 60,
+                "base_delay": 0.1,
+                "max_delay": 2.0
+            }
+        }
+        
+        for name, config in default_circuits.items():
+            self.create_circuit(name, **config)
+
+    def create_circuit(self, name: str, **kwargs) -> CircuitBreaker:
+        """Crear circuito con configuración optimizada"""
+        with self.lock:
+            if name in self.circuits:
+                return self.circuits[name]
+                
+            circuit = CircuitBreaker(name=name, **kwargs)
+            self.circuits[name] = circuit
+            logger.info(f"🔌 Circuit '{name}' ({circuit.circuit_type}) created with scalping optimization")
+            return circuit
+
+    def create_mt5_connection_circuit(self, name: str = "mt5_connection") -> CircuitBreaker:
+        """Método específico para circuito de conexión MT5 (más crítico)"""
+        return self.create_circuit(
+            name=name,
+            circuit_type="mt5_connection",
+            failure_threshold=2,
+            recovery_timeout=120,  # 2 minutos vs 5 originales
+            base_delay=0.1,
+            max_delay=2.0
+        )
+
+    def get_circuit(self, name: str) -> Optional[CircuitBreaker]:
+        """Obtener circuito de forma thread-safe"""
+        with self.lock:
+            return self.circuits.get(name)
+
+    def get_all_metrics(self) -> Dict[str, Dict[str, Any]]:
+        """Obtener métricas de todos los circuitos"""
+        with self.lock:
+            return {name: circuit.get_metrics() for name, circuit in self.circuits.items()}
+
+    def get_critical_circuits_status(self) -> Dict[str, str]:
+        """Estado rápido de circuitos críticos para monitoring"""
+        critical_circuits = ["mt5_connection", "order_execution", "ia_validation"]
+        status = {}
+        
+        with self.lock:
+            for name in critical_circuits:
+                circuit = self.circuits.get(name)
+                if circuit:
+                    status[name] = {
+                        'state': circuit.state.value,
+                        'failure_count': circuit.failure_count,
+                        'can_attempt': circuit.can_attempt()
+                    }
+        
+        return status
+
+    def reset_all(self):
+        """Reset todos los circuitos"""
+        with self.lock:
+            for circuit in self.circuits.values():
+                circuit.reset()
+        logger.info("🔄 All circuit breakers reset")
+
+    def force_open_all(self, reason: str = "Global emergency shutdown"):
+        """Forzar apertura de todos los circuitos (emergencia)"""
+        with self.lock:
+            for circuit in self.circuits.values():
+                circuit.force_open(reason)
+        logger.critical(f"🔴 ALL CIRCUITS FORCED OPEN: {reason}")
+
+    def export_to_prometheus(self):
+        """Exportar métricas a Prometheus"""
+        if not PROMETHEUS_AVAILABLE:
+            return
+            
+        with self.lock:
+            for name, circuit in self.circuits.items():
+                state_value = {'CLOSED': 0, 'OPEN': 1, 'HALF_OPEN': 2}[circuit.state.value]
+                STATE_GAUGE.labels(circuit=name).set(state_value)
+        logger.debug("📊 Circuit breaker metrics exported to Prometheus")
+
+    def health_check(self) -> Dict[str, Any]:
+        """Health check completo del sistema de circuit breakers"""
+        metrics = self.get_all_metrics()
+        critical_status = self.get_critical_circuits_status()
+        
+        health_status = {
+            "timestamp": datetime.now().isoformat(),
+            "total_circuits": len(self.circuits),
+            "critical_circuits_status": critical_status,
+            "overall_health": "HEALTHY",
+            "unhealthy_circuits": [],
+            "metrics_summary": {
+                "total_failures": sum(m['total_failures'] for m in metrics.values()),
+                "total_successes": sum(m['total_successes'] for m in metrics.values()),
+                "open_circuits": sum(1 for m in metrics.values() if m['current_state'] == 'OPEN')
+            }
+        }
+        
+        # Identificar circuitos no saludables
+        for name, circuit_metrics in metrics.items():
+            if circuit_metrics['current_state'] == 'OPEN':
+                health_status['unhealthy_circuits'].append(name)
+                
+        if health_status['unhealthy_circuits']:
+            health_status['overall_health'] = "DEGRADED"
+            if "mt5_connection" in health_status['unhealthy_circuits']:
+                health_status['overall_health'] = "CRITICAL"
+                
+        return health_status

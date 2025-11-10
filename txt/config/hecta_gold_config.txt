@@ -1,0 +1,151 @@
+{
+  "//": "LEGACY - HECTA GOLD CONFIG v8.5 - MIGRATED TO EAS HYBRID 2025",
+  "metadata": {
+    "status": "MIGRATED",
+    "migration_date": "2025-01-18T10:00:00Z",
+    "current_version": "EAS_Hybrid_2025_v1.0",
+    "backup_purpose": "REFERENCE_AND_ROLLBACK"
+  },
+
+  "system_info": {
+    "name": "HECTA GOLD SCALPER",
+    "version": "8.5",
+    "description": "LEGACY - Sistema híbrido de trading de oro migrado a EAS 2025",
+    "last_updated": "2025-01-18T10:00:00Z"
+  },
+  
+  "corerules": {
+    "riskpertrade": 0.3,
+    "maxdailyrisk": 1.0,
+    "consecutivelosslimit": 2,
+    "maxtrades": 3,
+    "tradinghours": "0830-1130 ET",
+    "premarketstart": "0830 ET",
+    "nyopentime": "0930",
+    "tradingduration": 2,
+    "premarketduration": 1,
+    "rrratio": 2.0,
+    "newsblackout": 15,
+    "VIXSpikeThreshold": 25,
+    "DXYSpikeThreshold": 0.5,
+    "breakeven_ratio": 1.5,
+    "max_spread_points": 10.0,
+    "slippage_tolerance": 10
+  },
+  
+  "gold_specific_parameters": {
+    "MaxSpreadPips": 3.0,
+    "ATRMultiplier": 1.8,
+    "VolatilityThreshold": 300,
+    "OvernightRiskReduction": 0.6,
+    "LondonNYBoost": 1.3,
+    "AsianSessionReduce": 0.7,
+    "EnhancedSyncEnabled": true,
+    "liquidity_swing_threshold": 0.002,
+    "fvg_detection_enabled": true,
+    "order_block_detection": true,
+    "mitigation_zone_analysis": true
+  },
+  
+  "sync_parameters": {
+    "freshness_threshold_seconds": 300,
+    "max_retry_attempts": 3,
+    "retry_delay_ms": 1000,
+    "critical_data_timeout": 10,
+    "cache_duration_minutes": 60
+  },
+  
+  "security_parameters": {
+    "min_data_freshness_score": 0.7,
+    "max_sync_issues": 3,
+    "emergency_shutdown_threshold": 5,
+    "enable_jailbreak_detection": true,
+    "enable_pii_filter": true
+  },
+  
+  "retry_policy": {
+    "max_retries": 3,
+    "base_delay_ms": 100,
+    "max_delay_ms": 5000,
+    "exponential_backoff": true
+  },
+  
+  "circuitbreakers": {
+    "maxfailures": 5,
+    "cooldownminutes": 30,
+    "half_open_retry_after": 1800,
+    "enable_auto_recovery": true
+  },
+  
+  "economiccalendar": {
+    "source_primary": "ForexFactory",
+    "source_fallback": "AlphaVantage",
+    "lookahead_hours": 24,
+    "enabled": true,
+    "high_impact_block_minutes": 60,
+    "mid_impact_block_minutes": 30
+  },
+  
+  "self_consistency": {
+    "num_inferences": 5,
+    "temperature": 0.5,
+    "consensus_threshold": 0.6,
+    "final_temperature": 0.0,
+    "enable_tot_fallback": true
+  },
+  
+  "human_safeguards": {
+    "extreme_risk_lower": 3,
+    "extreme_risk_upper": 8,
+    "confirmation_timeout_seconds": 30,
+    "enable_manual_override": true
+  },
+  
+  "evaluation": {
+    "report_interval_seconds": 3600,
+    "degradation_threshold": 2.0,
+    "enable_performance_tracking": true
+  },
+  
+  "api_keys": {
+    "anthropic": "ANTHROPIC_API_KEY_HERE",
+    "alpha_vantage": "ALPHA_VANTAGE_API_KEY_HERE",
+    "fred": "FRED_API_KEY_HERE",
+    "telegram_bot": "TELEGRAM_BOT_TOKEN_HERE",
+    "telegram_chat_id": "TELEGRAM_CHAT_ID_HERE"
+  },
+  
+  "monitoring": {
+    "enable_real_time_dashboard": true,
+    "enable_alerts": true,
+    "alert_channels": ["telegram", "email", "console"],
+    "log_level": "INFO",
+    "metrics_retention_days": 30
+  },
+  
+  "advanced_features": {
+    "enable_ml_predictions": true,
+    "enable_multi_timeframe_analysis": true,
+    "enable_liquidity_analysis": true,
+    "enable_sentiment_analysis": true,
+    "enable_auto_optimization": true
+  },
+
+  "migration_information": {
+    "new_config_files": [
+      "../trading_config.json",
+      "../agents_config.json", 
+      "../risk_config.json"
+    ],
+    "migration_status": "COMPLETED",
+    "critical_parameters_preserved": {
+      "risk_management": "ALL_CORE_PARAMETERS",
+      "session_timing": "NY_OPEN_SESSION",
+      "instrument_specific": "XAUUSD_OPTIMIZED"
+    },
+    "emergency_rollback": {
+      "script": "../scripts/rollback_to_legacy.py",
+      "conditions": "PERFORMANCE_DEGRADATION_OR_SYSTEM_FAILURE"
+    }
+  }
+}

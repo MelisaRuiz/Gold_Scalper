@@ -1,0 +1,20 @@
+
+## ⚙️ Instalación y Configuración
+
+### Prerrequisitos
+
+- Python 3.9 o superior
+- 8GB RAM mínimo (16GB recomendado)
+- Conexión a internet estable
+- Acceso a datos de mercado (MT5/IBKR/Polygon)
+
+### Instalación
+
+1. **Clonar y configurar entorno**:
+```bash
+git clone <repository-url>
+cd hecta_gold_scalper
+python -m venv venv
+source venv/bin/activate  # Linux/Mac
+# o
+venv\Scripts\activate     # Windows
